@@ -1,0 +1,7 @@
+coppeliasim-zmqremoteapi-client==2.0.4
+numpy>=1.26,<3
+opencv-python-headless>=4.9,<5
+matplotlib>=3.8,<4
+coacd==1.0.14  # optional: lecture1/ycb_objects.py coacd
+octomap-python==1.8.0.13  # optional probabilistic map backend; native Octree needs no binding
+torch>=2.6,<3  # lecture2/support/grconvnet.py: pretrained grasp inference

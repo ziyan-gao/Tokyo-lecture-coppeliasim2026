@@ -1,0 +1,8 @@
+# VS Code mounts the complete repository; CoppeliaSim stays on the host.
+services:
+  lab:
+    # initializeCommand builds the image before Dev Containers starts this service.
+    build: !reset null
+    volumes:
+      - .:/workspace:cached
+    command: sleep infinity

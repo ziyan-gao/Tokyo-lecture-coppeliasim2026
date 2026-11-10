@@ -1,0 +1,27 @@
+// VS Code "Dev Containers: Reopen in Container" -> work inside the lab container,
+// then run / debug any script with the editor's Run button or F5.
+// CoppeliaSim still runs on the host (ZMQ :23000), exactly as with `docker compose run`.
+{
+  "name": "CoppeliaSim course",
+  "dockerComposeFile": ["../docker-compose.yml", "docker-compose.devcontainer.yml"],
+  "service": "lab",
+  "initializeCommand": "docker compose build lab",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.debugpy",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "charliermarsh.ruff"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.analysis.extraPaths": ["/workspace/scripts"],
+        "[python]": { "editor.defaultFormatter": "charliermarsh.ruff" }
+      }
+    }
+  }
+}

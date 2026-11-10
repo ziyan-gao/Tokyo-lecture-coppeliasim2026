@@ -1,0 +1,12 @@
+line-length = 120
+src = ["scripts"]  # lecture and shared packages
+
+[lint.per-file-ignores]
+# lesson scripts put scripts/ on sys.path before importing the shared modules
+"scripts/*/*.py" = ["E402"]
+
+[format]
+skip-magic-trailing-comma = true
+
+[lint.isort]
+split-on-trailing-comma = false

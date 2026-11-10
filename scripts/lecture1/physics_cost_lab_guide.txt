@@ -1,0 +1,177 @@
+PHYSICS COST LAB — MULTIPLE FREE RIGID BODIES, NO ROBOT
+
+Run:
+    docker compose run --rm lab python lecture1/physics_cost_lab.py
+    python scripts/lecture1/physics_cost_lab.py --self-test
+
+The simulator's English panel provides configuration selectors and three actions:
+Run current settings, Compare selected factor, Exit after current experiment.
+Select one comparison factor; Compare rebuilds the scene for every listed value.
+The exit control is honored between trials; Ctrl+C also stops the running trial.
+The /Lab tree is rebuilt for each trial, as in the other course scripts. Start in
+a clean scene: unrelated objects, scripts, cameras, and plugins outside /Lab are
+not removed and can affect the experiment. Global engine/time settings are restored.
+
+WHAT IS THE FUNDAMENTAL UNIT OF WORK?
+
+A free dynamic rigid body has six velocity degrees of freedom, but body count alone
+is not a sufficient predictor. The engine must find potential interactions, compute
+contacts, and solve their coupled response. A useful bookkeeping model is:
+
+T_main ~= H * (T_update + T_broad + T_narrow + T_contact + T_solve + T_integrate)
+          + T_scripts + T_render + T_sensors + T_communication
+
+H is the number of physics substeps inside one main simulation step. This is an
+accounting approximation, not a universal complexity law: some engines fuse stages,
+reuse computations, or execute work concurrently. Initialization is separate.
+
+1. UPDATE / ACTIVE STATE
+   Active bodies, degrees of freedom, forces, inertia transforms, bounding volumes,
+   wake/sleep transitions, insertion/removal, rebuilding acceleration structures.
+   Sleeping can remove work, but depends on engine, version, policy and scene state.
+   A body with small measured velocity is not proof that it is sleeping.
+
+2. BROAD PHASE
+   Collision-shape count, AABB sizes and aspect ratios, spatial density, relative
+   placement, motion coherence, static/dynamic classification, collision masks,
+   spatial acceleration structure and rebuild policy. More overlapping AABBs means
+   more candidate pairs. Not every engine checks every possible N*(N-1)/2 pair.
+   Sparse scenes can scale very differently from a dense cluster with the same N.
+   Broad-phase candidates are not the same thing as actual contacting pairs.
+
+3. NARROW PHASE / CONTACT GENERATION
+   Shape pair type, analytic primitives vs convex meshes vs non-convex meshes,
+   hull vertices/support queries, mesh BVH quality and triangle distribution,
+   compound child count and child-pair overlap, contact margins, penetration depth,
+   thin features, degenerate or badly scaled geometry, manifold size/reduction,
+   cached contacts, temporal coherence, continuous collision detection (CCD),
+   swept motion, angular speed, and collision tolerance.
+   Triangle count is meaningful for mesh processing, not a universal physics metric.
+   A detailed rendered sphere can still have a center/radius collision description.
+   CoACD can replace one difficult non-convex collider with many easier convex ones;
+   more convex pieces can also increase child pairs and contact constraints.
+
+4. CONSTRAINT SOLUTION
+   Number of contact points, normal/friction/rolling/torsional constraints,
+   connectivity of the contact graph, island sizes, sparse/dense matrix structure,
+   stack height and force propagation, solver algorithm, iteration limits and
+   tolerance, warm starting, preconditioning, parallelism and available memory.
+   Mass and inertia ratios, slender bodies, overlapping contacts, redundant
+   constraints and stiff contacts can make the system harder to solve.
+   A large island may couple bodies strongly; static ground does not automatically
+   make all resting bodies a single coupled dynamic island in every solver.
+   Fixed-iteration solvers may become LESS ACCURATE rather than take longer when
+   the problem gets harder. Adaptive/convergence-based solvers can take longer.
+
+5. MATERIALS / PHYSICAL REGIME
+   Friction model and dimensions, coefficient combination rules on both surfaces,
+   restitution, damping, compliance/stiffness, contact regularization, gravity,
+   external forces, velocities and impact frequency all influence contact evolution.
+   Increasing a friction coefficient is not a guaranteed increase in computation.
+   Gravity or mass magnitude alone does not inherently add solver rows; it can
+   change the motion/contact regime and numerical conditioning.
+   Contact noise can keep bodies awake and continually change contact manifolds.
+
+6. TIME / ACCURACY
+   Physics substep h, main step dt, substeps H, total simulated duration, integrator,
+   solver accuracy, CCD policy, collision margins and tolerances. Halving h usually
+   increases the number of physics updates per simulated second; cost per substep
+   need not stay constant. Increasing main dt may amortize communication/rendering
+   while leaving physics updates per simulated second approximately unchanged.
+   Use cost per simulated second or real-time factor when dt differs, NOT just ms/step.
+   Numerical stability and task accuracy must be compared alongside speed.
+
+7. DISPLAY / SENSORS / HOST APPLICATION
+   Visual triangle counts, object draw calls, shadows, lights, textures and memory,
+   resolution, cameras, sensor update frequency, GUI redraws, debug edges, contact
+   drawings, callbacks, scripts, logging, video capture and encoding, external
+   API round trips and serialization, real-time throttling, scene synchronization.
+   Coroutine scheduling can hide independent waits; it does not reduce the engine's
+   collision/constraint work and is not equivalent to parallel physics solving.
+
+8. IMPLEMENTATION / HARDWARE / MEASUREMENT
+   Engine/version/backend, collision representation fallback, CPU/GPU architecture,
+   SIMD, thread counts, island parallelism, memory bandwidth, cache behavior,
+   allocation, precision, compiler/build settings, other processes, power/thermal
+   throttling, drivers, virtualization, communication latency and synchronization.
+   CPU and GPU work can overlap: wall time is not a sum of isolated CPU/GPU timers.
+   GPU acceleration is engine/backend dependent, not an automatic property of
+   CoppeliaSim or a large number of bodies.
+
+These categories are a practical causal inventory, not a claim to enumerate every
+engine-specific implementation detail. Exact stage costs require engine profiling.
+
+WHAT THIS IMPLEMENTATION MEASURES
+
+- Bullet, no robot, no vision sensors, no video recording.
+- perf_counter immediately around sim.step(): wall latency of a MAIN step.
+- The timer includes whatever work sim.step waits for: simulator scripts, physics,
+  rendering/synchronization and remote-call overhead. It is NOT pure physics time.
+- UI/progress updates and final diagnostic queries occur outside that timer.
+- Build time and simulation startup time are recorded separately.
+- Mean, P95, first-step latency, second-half mean, and step-only real-time factor.
+- Linear AND angular low-speed count, plus centers below z=-0.1 m, at the end.
+- No engine-internal contact, candidate-pair, solver-row or sleeping counts are
+  invented. No claim is made that low velocity measures actual sleep state.
+- Main dt and actual requested/effective physics step property are exported.
+- Samples include the first step, so startup effects remain visible. Startup work
+  may be deferred by the engine into that first step.
+- Repeated trials use the same seed and alternate the order of comparison cases;
+  standard deviation across trial means is shown. This is not a confidence interval.
+- The time trace shows the first repeat, rather than averaging trajectories whose
+  contact events may diverge. Each repeat resets the scene, not the whole engine process.
+- The first half and second half are different physical regimes; second-half mean
+  is not automatically a measurement of resting-state/sleeping performance.
+- Export directory names use UTC for sorting; filenames are unique.
+
+CONTROLS AND THEIR INTERPRETATION
+
+Count: 0 gives a floor-only baseline. Do not assume baseline subtraction isolates
+physics exactly; overhead and rendering scheduling can change with scene content.
+Geometry: primitive compound vs general mesh. Both render the same generated
+sphere/cuboid dumbbell mesh. Only the primitive version has a hidden analytic proxy.
+The general mesh contains intersecting component surfaces, like shape_types.py.
+Mesh approximation and inertia estimates can still change trajectories.
+Resolution: primitive collision geometry stays fixed; only its visual mesh changes.
+In mesh mode, both collision and visual mesh resolution change. Compare the effect
+in each mode to distinguish rendering sensitivity from collision sensitivity.
+Layout: sparse, pile, tower. Shapes initially do not overlap. This changes density,
+contact topology and trajectories together; it does not hold contact count fixed.
+Friction: set on both the floor and every body; the engine's coefficient combination
+rule still determines the effective contact friction.
+Iterations: Bullet iteration budget, not a count of iterations actually used.
+Main dt / physics dt: change one at a time. Always inspect real-time factor too.
+Mass ratio: alternating masses; inertia scales with mass. A conditioning experiment,
+not a claim that multiplying all masses by a constant multiplies compute cost.
+Collisions: disable body response. Bodies can fall through the floor; this is an
+intentional workload ablation, not a physically valid faster simulation.
+Visible: hide body geometry by layer. Physics is unchanged; the floor/UI still draw.
+Dynamic: static geometry removes body dynamics, but broad-phase scene storage and
+rendering remain. Static and sleeping are different states.
+Duration and repeats configure the measurement; they are not comparison factors.
+
+RECOMMENDED TEACHING ORDER
+
+A. Count in sparse primitive scenes: observe baseline and scaling.
+B. Same count, compare sparse/pile/tower: interaction graph matters.
+C. Compare collisions on/off: response-related work and physical validity.
+D. Compare primitive/mesh with identical displayed geometry.
+E. Vary resolution first with primitive collision, then with mesh collision.
+F. Compare 10/50/100 solver iterations: cost versus penetration/jitter.
+G. Compare physics substeps; then main steps; distinguish ms/step from ms/simulated s.
+H. Compare mass ratios and friction; inspect motion rather than assuming monotonic cost.
+I. Compare early and late time traces; consider settling, manifold changes and sleep.
+J. Compare visible/hidden to estimate sensitivity to display overhead.
+
+The panel does not expose every inventory factor: CCD, solver variants, measured
+contact graph, contact margin, explicit sleep controls, other engines, GPU execution,
+engine-internal profiling and video capture remain separate experiments. Exposing
+unsupported controls with guessed behavior would undermine the teaching purpose.
+
+REFERENCES
+https://mujoco.readthedocs.io/en/stable/computation.html
+https://mujoco.readthedocs.io/en/stable/modeling.html
+https://manual.coppeliarobotics.com/en/propertiesReference.htm
+https://manual.coppeliarobotics.com/en/physicsEngineDifferences.htm
+https://manual.coppeliarobotics.com/en/simulation.htm
+https://manual.coppeliarobotics.com/en/sim/simGetContactInfo.htm
