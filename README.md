@@ -14,6 +14,8 @@ Install **CoppeliaSim 4.10** for your OS from [Coppelia Robotics](https://www.co
 | Windows 11, x86-64 | [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/), **WSL 2**, **Linux containers** |
 | macOS, Intel or Apple Silicon | [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/) matching your processor |
 
+**Windows users: follow the [step-by-step Windows guide](docs/windows.md) first.**
+
 Use a supported desktop OS with a compatible CoppeliaSim build and graphics drivers. The Python container uses CPU PyTorch; GPU passthrough is unnecessary. Other systems/architectures are not guaranteed.
 
 ## Run
